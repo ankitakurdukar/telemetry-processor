@@ -1,0 +1,111 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Transform": "AWS::Serverless-2016-10-31",
+  "Description": "Telemetry Processor",
+
+  "Resources": {
+    "TelemetryTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "TelemetryStore",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "siteId",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [{ "AttributeName": "siteId", "KeyType": "HASH" }],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": 2,
+          "WriteCapacityUnits": 2
+        }
+      }
+    },
+    "TelemetryQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": "TelemetryQueue"
+      }
+    },
+    "TelemetryDLQ": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": "TelemetryDLQ"
+      }
+    },
+    "TelemetryProcessorFunction": {
+      "Type": "AWS::Serverless::Function",
+      "Properties": {
+        "CodeUri": "src/",
+        "Handler": "telemetryProcessor.handler",
+        "Runtime": "nodejs18.x",
+        "Environment": {
+          "Variables": {
+            "DYNAMO_DB_TABLE": { "Ref": "TelemetryTable" },
+            "DLQ_URL": { "Fn::GetAtt": ["TelemetryDLQ", "QueueUrl"] }
+          }
+        },
+        "Events": {
+          "SQSEvent": {
+            "Type": "SQS",
+            "Properties": {
+              "Queue": {
+                "Fn::GetAtt": ["TelemetryQueue", "Arn"]
+              }
+            }
+          }
+        },
+        "Policies": [
+          {
+            "DynamoDBCrudPolicy": {
+              "TableName": {
+                "Ref": "TelemetryTable"
+              }
+            }
+          },
+          {
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": ["sqs:SendMessage"],
+                "Resource": {
+                  "Fn:GetAtt": ["TelemetryDLQ", "Arn"]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "ApiGateway": {
+      "Type": "AWS::Serverless::Api",
+      "Properties": {
+        "StageName": "test",
+        "DefinitionBody": {
+          "swagger": "2.0",
+          "paths": {
+            "/telemetry/{siteId}": {
+              "post": {
+                "x-amazon-apigateway-integration": {
+                  "uri": {
+                    "Fn::Sub": "arn:aws:apigateway:${AWS::Region}:sqs:path/${TelemetryQueue}"
+                  },
+                  "httpMethod": "POST",
+                  "type": "aws_proxy"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "ApiEndpoint": {
+      "Description": "Public access Endpoint",
+      "Value": {
+        "Fn::Sub": "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/test/telemetry"
+      }
+    }
+  }
+}
