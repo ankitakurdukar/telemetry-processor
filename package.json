@@ -1,0 +1,13 @@
+{
+  "name": "telemetry-processor",
+  "description": "Telemetry Processor",
+  "version": "0.0.1",
+  "dependencies": {
+    "aws-lambda": "^1.0.7"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "aws-sdk": "^2.1231.0",
+    "aws-sdk-mock": "^5.8.0"
+  }
+}
