@@ -6,10 +6,10 @@ const tableName = process.env.DYNAMO_DB_TABLE;
 const sqs = new AWS.SQS();
 const dlqUrl = process.env.DLQ_URL;
 
-if (!tableName) throw new Error("DYNAMO_DB_TABLE is a required env variable");
-if (!dlqUrl) throw new Error("DLQ_URL is a required env variable");
-
 export const handler: SQSHandler = async (event: SQSEvent) => {
+  if (!tableName) throw new Error("DYNAMO_DB_TABLE is a required env variable");
+  if (!dlqUrl) throw new Error("DLQ_URL is a required env variable");
+
   for (const record of event.Records) {
     const telemetryData = JSON.parse(record.body);
 
